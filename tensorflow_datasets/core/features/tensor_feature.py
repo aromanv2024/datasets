@@ -268,15 +268,24 @@ class Tensor(feature_lib.FeatureConnector):
     else:
       value = example_data
       shape = np_utils.to_np_shape(self._shape)
+    if (
+        self._dtype == np.uint64
+        and not self._encoded_to_bytes
+        and isinstance(value, np.ndarray)
+    ):
+      value = value.view(np.uint64)
     return value, shape
 
   def decode_example(self, tfexample_data):
     """See base class for details."""
     value, shape = self._get_value_and_shape(tfexample_data)
+    decode_dtype = self.tf_dtype if self.tf_dtype != tf.uint64 else tf.int64
     if self._encoded_to_bytes:
       if self._encoding == Encoding.ZLIB:
         value = tf.io.decode_compressed(value, compression_type='ZLIB')
-      value = tf.io.decode_raw(value, self.tf_dtype)
+      value = tf.io.decode_raw(value, decode_dtype)
+      if self.dtype == tf.uint64:
+        value = tf.bitcast(value, tf.uint64)
       value = tf.reshape(value, shape)
 
     return value
